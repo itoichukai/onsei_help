@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="VOCAアプリ">
+<title>VOCAアプリ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a18;min-height:100vh}
+.app{padding:12px;max-width:680px;margin:0 auto}
+h1{font-size:18px;font-weight:500;padding:12px 0 10px;color:#1a1a18}
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+select,input[type=text]{font-size:13px;padding:6px 10px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a18;height:34px}
+.btn{font-size:13px;padding:0 14px;height:34px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#1a1a18;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:#f0f0ec}
+.btn:active{transform:scale(0.98)}
+.btn.danger{color:#c0392b;border-color:#e8b4b0}
+.btn.active-rec{background:#fce8e8;color:#c0392b;border-color:#e8b4b0}
+.btn.primary{background:#ddeeff;color:#1a5fa8;border-color:#b5d4f4}
+.grid{display:grid;gap:8px}
+.cell{background:#fff;border:1px solid #ddd;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px 6px;min-height:100px;position:relative;transition:background 0.1s;-webkit-tap-highlight-color:transparent}
+.cell:hover{background:#f5f5f0}
+.cell:active{transform:scale(0.97)}
+.cell.has-audio{border-color:#6aadee}
+.cell.playing{background:#ddeeff;border-color:#6aadee}
+.cell.empty-slot{opacity:0.4}
+.cell img{width:56px;height:56px;object-fit:cover;border-radius:8px}
+.cell .label{font-size:12px;font-weight:500;color:#1a1a18;text-align:center;word-break:break-all;max-width:90px;line-height:1.3}
+.cell .no-content{font-size:11px;color:#999;text-align:center}
+.cell .badge{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#378add}
+.edit-btn{position:absolute;bottom:5px;right:5px;font-size:14px;color:#aaa;opacity:0;transition:opacity 0.1s;background:none;border:none;cursor:pointer;padding:2px}
+.cell:hover .edit-btn{opacity:1}
+.cell:focus .edit-btn{opacity:1}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:12px}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:12px;border:1px solid #ddd;padding:20px;width:320px;max-width:100%;display:flex;flex-direction:column;gap:14px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:500;color:#1a1a18}
+.modal label{font-size:12px;color:#666;display:block;margin-bottom:4px}
+.modal input[type=text]{width:100%;font-size:14px;padding:7px 10px;border:1px solid #ccc;border-radius:8px;background:#fafafa;color:#1a1a18}
+.img-preview{width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid #ddd;display:none}
+.img-placeholder{width:70px;height:70px;border-radius:8px;border:1px solid #ddd;background:#f5f5f0;display:flex;align-items:center;justify-content:center}
+.rec-area{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rec-timer{font-size:13px;color:#666;min-width:40px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.volume-row{display:flex;align-items:center;gap:8px}
+.volume-row input[type=range]{flex:1;accent-color:#378add}
+.level-tabs{display:flex;gap:6px}
+.level-tab{font-size:12px;padding:4px 12px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#666;cursor:pointer}
+.level-tab.active{background:#ddeeff;color:#1a5fa8;border-color:#b5d4f4}
+@media(max-width:400px){.cell{min-height:80px}.cell img{width:44px;height:44px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>VOCAアプリ</h1>
+  <div class="toolbar">
+    <div class="level-tabs" id="levelTabs"></div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <select id="colSelect" title="列数">
+        <option value="3">3列</option>
+        <option value="4" selected>4列</option>
+        <option value="5">5列</option>
+      </select>
+      <div class="volume-row" style="gap:6px">
+        <i class="ti ti-volume" aria-hidden="true" style="font-size:16px;color:#888"></i>
+        <input type="range" id="volSlider" min="0" max="1" step="0.05" value="1" style="width:70px">
+      </div>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" role="dialog" aria-labelledby="modalTitle">
+    <h3 id="modalTitle">ボタンを編集</h3>
+    <div>
+      <label for="labelInput">ラベル</label>
+      <input type="text" id="labelInput" placeholder="例：ありがとう">
+    </div>
+    <div>
+      <label>画像</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="img-placeholder" id="imgPlaceholder"><i class="ti ti-photo" aria-hidden="true" style="font-size:22px;color:#bbb"></i></div>
+        <img class="img-preview" id="imgPreview" alt="">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button class="btn" onclick="document.getElementById('imgInput').click()"><i class="ti ti-upload" aria-hidden="true"></i>画像を選択</button>
+          <button class="btn danger" id="imgClearBtn"><i class="ti ti-x" aria-hidden="true"></i>画像を削除</button>
+        </div>
+        <input type="file" id="imgInput" accept="image/*" style="display:none">
+      </div>
+    </div>
+    <div>
+      <label>音声録音</label>
+      <div class="rec-area">
+        <button class="btn" id="recBtn"><i class="ti ti-microphone" aria-hidden="true"></i>録音開始</button>
+        <span class="rec-timer" id="recTimer"></span>
+      </div>
+      <audio id="recPreview" controls style="height:32px;width:100%;margin-top:8px;display:none"></audio>
+    </div>
+    <div>
+      <label>ボタンの色</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="colorPicker"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn danger" id="clearBtn"><i class="ti ti-trash" aria-hidden="true"></i>クリア</button>
+      <button class="btn" onclick="closeModal()">キャンセル</button>
+      <button class="btn primary" id="saveBtn"><i class="ti ti-check" aria-hidden="true"></i>保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LEVELS=3,CELLS=20;
+const COLORS=[
+  {name:'なし',val:''},
+  {name:'青',val:'#ddeeff'},
+  {name:'緑',val:'#e6f5e0'},
+  {name:'黄',val:'#fff8dd'},
+  {name:'赤',val:'#fce8e8'},
+  {name:'紫',val:'#eeecff'},
+  {name:'桃',val:'#fde8f0'},
+  {name:'橙',val:'#fff0e0'},
+];
+let state={level:0,cols:4,volume:1};
+let data=Array.from({length:LEVELS},()=>Array.from({length:CELLS},()=>({label:'',imgSrc:'',audioB64:'',color:''})));
+let editIdx=null,mediaRec=null,recChunks=[],recInterval=null,recSec=0,tempAudio='',tempImg='',currentAudio=null;
+
+try{const s=localStorage.getItem('voca_data_v2');if(s)data=JSON.parse(s);}catch(e){}
+function save(){try{localStorage.setItem('voca_data_v2',JSON.stringify(data));}catch(e){alert('保存容量が不足しています。不要なボタンをクリアしてください。');}}
+
+const grid=document.getElementById('grid');
+const colSelect=document.getElementById('colSelect');
+const volSlider=document.getElementById('volSlider');
+const levelTabs=document.getElementById('levelTabs');
+
+function buildLevelTabs(){
+  levelTabs.innerHTML='';
+  for(let i=0;i<LEVELS;i++){
+    const b=document.createElement('button');
+    b.className='level-tab'+(state.level===i?' active':'');
+    b.textContent='レベル'+(i+1);
+    b.onclick=()=>{state.level=i;buildLevelTabs();renderGrid();};
+    levelTabs.appendChild(b);
+  }
+}
+
+function renderGrid(){
+  grid.style.gridTemplateColumns='repeat('+state.cols+',1fr)';
+  grid.innerHTML='';
+  data[state.level].forEach((c,i)=>{
+    const div=document.createElement('div');
+    div.className='cell'+(c.audioB64?' has-audio':'')+((!c.label&&!c.imgSrc&&!c.audioB64)?' empty-slot':'');
+    if(c.color) div.style.background=c.color;
+    if(c.audioB64){const d=document.createElement('div');d.className='badge';div.appendChild(d);}
+    if(c.imgSrc){const im=document.createElement('img');im.src=c.imgSrc;im.alt=c.label||'';div.appendChild(im);}
+    if(c.label){const sp=document.createElement('span');sp.className='label';sp.textContent=c.label;div.appendChild(sp);}
+    if(!c.label&&!c.imgSrc){const sp=document.createElement('span');sp.className='no-content';sp.textContent='タップして設定';div.appendChild(sp);}
+    const eb=document.createElement('button');eb.className='edit-btn';eb.innerHTML='<i class="ti ti-pencil" aria-hidden="true"></i>';eb.title='編集';
+    eb.onclick=e=>{e.stopPropagation();openModal(i);};
+    div.appendChild(eb);
+    div.onclick=()=>playCell(i,div);
+    div.setAttribute('tabindex','0');
+    div.onkeydown=e=>{if(e.key===' '||e.key==='Enter')playCell(i,div);};
+    grid.appendChild(div);
+  });
+}
+
+function playCell(i,div){
+  const c=data[state.level][i];
+  if(!c.audioB64)return;
+  if(currentAudio){currentAudio.pause();currentAudio=null;document.querySelectorAll('.cell.playing').forEach(x=>x.classList.remove('playing'));}
+  const audio=new Audio(c.audioB64);
+  audio.volume=state.volume;
+  currentAudio=audio;
+  div.classList.add('playing');
+  audio.play();
+  audio.onended=()=>{div.classList.remove('playing');currentAudio=null;};
+}
+
+colSelect.onchange=()=>{state.cols=parseInt(colSelect.value);renderGrid();};
+volSlider.oninput=()=>{state.volume=parseFloat(volSlider.value);};
+
+function openModal(i){
+  editIdx=i;
+  const c=data[state.level][i];
+  document.getElementById('labelInput').value=c.label||'';
+  tempAudio=c.audioB64||'';
+  tempImg=c.imgSrc||'';
+  const prev=document.getElementById('recPreview');
+  if(tempAudio){prev.src=tempAudio;prev.style.display='block';}else{prev.style.display='none';prev.src='';}
+  const imgPrev=document.getElementById('imgPreview');
+  const imgPh=document.getElementById('imgPlaceholder');
+  if(tempImg){imgPrev.src=tempImg;imgPrev.style.display='block';imgPh.style.display='none';}
+  else{imgPrev.style.display='none';imgPh.style.display='flex';}
+  document.getElementById('recTimer').textContent='';
+  document.getElementById('recBtn').className='btn';
+  document.getElementById('recBtn').innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+  buildColorPicker(c.color||'');
+  document.getElementById('modalBg').classList.add('open');
+  setTimeout(()=>document.getElementById('labelInput').focus(),100);
+}
+
+function buildColorPicker(current){
+  const cp=document.getElementById('colorPicker');
+  cp._sel=current;
+  cp.innerHTML='';
+  COLORS.forEach(({name,val})=>{
+    const b=document.createElement('button');
+    b.style.cssText='width:28px;height:28px;border-radius:50%;border:2px solid '+(val===current?'#378add':'#ccc')+';background:'+(val||'#fff')+';cursor:pointer;title='+name;
+    b.title=name;
+    b.onclick=()=>{cp.querySelectorAll('button').forEach(x=>x.style.borderColor='#ccc');b.style.borderColor='#378add';cp._sel=val;};
+    cp.appendChild(b);
+  });
+}
+
+function closeModal(){
+  stopRec();
+  document.getElementById('modalBg').classList.remove('open');
+  editIdx=null;
+}
+
+document.getElementById('modalBg').onclick=e=>{if(e.target===document.getElementById('modalBg'))closeModal();};
+
+document.getElementById('imgInput').onchange=function(){
+  const file=this.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const size=200;
+      canvas.width=size;canvas.height=size;
+      const ctx=canvas.getContext('2d');
+      const r=Math.min(img.width,img.height);
+      const sx=(img.width-r)/2,sy=(img.height-r)/2;
+      ctx.drawImage(img,sx,sy,r,r,0,0,size,size);
+      tempImg=canvas.toDataURL('image/jpeg',0.7);
+      document.getElementById('imgPreview').src=tempImg;
+      document.getElementById('imgPreview').style.display='block';
+      document.getElementById('imgPlaceholder').style.display='none';
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+document.getElementById('imgClearBtn').onclick=()=>{
+  tempImg='';
+  document.getElementById('imgPreview').style.display='none';
+  document.getElementById('imgPlaceholder').style.display='flex';
+  document.getElementById('imgInput').value='';
+};
+
+document.getElementById('recBtn').onclick=toggleRec;
+
+function toggleRec(){
+  if(mediaRec&&mediaRec.state==='recording'){stopRec();return;}
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    recChunks=[];recSec=0;
+    document.getElementById('recTimer').textContent='0秒';
+    const mimeType=MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/mp4';
+    mediaRec=new MediaRecorder(stream,{mimeType});
+    mediaRec.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
+    mediaRec.onstop=()=>{
+      const blob=new Blob(recChunks,{type:mimeType});
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        tempAudio=ev.target.result;
+        const prev=document.getElementById('recPreview');
+        prev.src=tempAudio;prev.style.display='block';
+      };
+      reader.readAsDataURL(blob);
+      stream.getTracks().forEach(t=>t.stop());
+    };
+    mediaRec.start();
+    const btn=document.getElementById('recBtn');
+    btn.className='btn active-rec';
+    btn.innerHTML='<i class="ti ti-player-stop" aria-hidden="true"></i>録音停止';
+    recInterval=setInterval(()=>{recSec++;document.getElementById('recTimer').textContent=recSec+'秒';},1000);
+  }).catch(()=>alert('マイクへのアクセスを許可してください'));
+}
+
+function stopRec(){
+  if(mediaRec&&mediaRec.state==='recording')mediaRec.stop();
+  clearInterval(recInterval);
+  const btn=document.getElementById('recBtn');
+  btn.className='btn';
+  btn.innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+}
+
+document.getElementById('saveBtn').onclick=()=>{
+  if(editIdx===null)return;
+  const label=document.getElementById('labelInput').value.trim();
+  const cp=document.getElementById('colorPicker');
+  const color=cp._sel!==undefined?cp._sel:'';
+  data[state.level][editIdx]={label,imgSrc:tempImg,audioB64:tempAudio,color};
+  save();renderGrid();closeModal();
+};
+
+document.getElementById('clearBtn').onclick=()=>{
+  if(editIdx===null)return;
+  if(!confirm('このボタンの内容を消去しますか？'))return;
+  data[state.level][editIdx]={label:'',imgSrc:'',audioB64:'',color:''};
+  save();renderGrid();closeModal();
+};
+
+buildLevelTabs();
+renderGrid();
+</script>
+</body>
+</html>
