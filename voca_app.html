@@ -126,8 +126,8 @@ let state={level:0,cols:4,volume:1};
 let data=Array.from({length:LEVELS},()=>Array.from({length:CELLS},()=>({label:'',imgSrc:'',audioB64:'',color:''})));
 let editIdx=null,mediaRec=null,recChunks=[],recInterval=null,recSec=0,tempAudio='',tempImg='',currentAudio=null;
 
-try{const s=localStorage.getItem('voca_data_v2');if(s)data=JSON.parse(s);}catch(e){}
-function save(){try{localStorage.setItem('voca_data_v2',JSON.stringify(data));}catch(e){alert('保存容量が不足しています。不要なボタンをクリアしてください。');}}
+try{const s=localStorage.getItem('voca_data_v2');if(s)data=JSON.parse(s);}catch(e){console.error('保存データの読み込みに失敗しました。初期状態で起動します。',e);}
+function save(){try{localStorage.setItem('voca_data_v2',JSON.stringify(data));}catch(e){console.error('保存に失敗しました',e);alert('保存容量が不足しています。不要なボタンをクリアしてください。');}}
 
 const grid=document.getElementById('grid');
 const colSelect=document.getElementById('colSelect');
@@ -174,8 +174,11 @@ function playCell(i,div){
   audio.volume=state.volume;
   currentAudio=audio;
   div.classList.add('playing');
-  audio.play();
-  audio.onended=()=>{div.classList.remove('playing');currentAudio=null;};
+  const clear=()=>{div.classList.remove('playing');if(currentAudio===audio)currentAudio=null;};
+  audio.onended=clear;
+  audio.onerror=()=>{clear();console.error('音声の再生に失敗しました');alert('音声の再生に失敗しました');};
+  const p=audio.play();
+  if(p&&p.catch)p.catch(err=>{clear();console.error('音声の再生に失敗しました',err);alert('音声の再生に失敗しました');});
 }
 
 colSelect.onchange=()=>{state.cols=parseInt(colSelect.value);renderGrid();};
@@ -225,8 +228,10 @@ document.getElementById('modalBg').onclick=e=>{if(e.target===document.getElement
 document.getElementById('imgInput').onchange=function(){
   const file=this.files[0];if(!file)return;
   const reader=new FileReader();
+  reader.onerror=()=>{console.error('画像の読み込みに失敗しました',reader.error);alert('画像の読み込みに失敗しました');};
   reader.onload=e=>{
     const img=new Image();
+    img.onerror=()=>{console.error('画像の読み込みに失敗しました');alert('画像を読み込めませんでした。別の画像を選択してください。');};
     img.onload=()=>{
       const canvas=document.createElement('canvas');
       const size=200;
@@ -257,28 +262,38 @@ document.getElementById('recBtn').onclick=toggleRec;
 function toggleRec(){
   if(mediaRec&&mediaRec.state==='recording'){stopRec();return;}
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    const cleanup=()=>stream.getTracks().forEach(t=>t.stop());
     recChunks=[];recSec=0;
     document.getElementById('recTimer').textContent='0秒';
     const mimeType=MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/mp4';
-    mediaRec=new MediaRecorder(stream,{mimeType});
+    try{
+      mediaRec=new MediaRecorder(stream,{mimeType});
+    }catch(err){
+      cleanup();
+      console.error('録音の開始に失敗しました',err);
+      alert('録音の開始に失敗しました');
+      return;
+    }
     mediaRec.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
+    mediaRec.onerror=e=>{console.error('録音中にエラーが発生しました',e.error);alert('録音中にエラーが発生しました');stopRec();cleanup();};
     mediaRec.onstop=()=>{
       const blob=new Blob(recChunks,{type:mimeType});
       const reader=new FileReader();
+      reader.onerror=()=>{console.error('録音データの変換に失敗しました',reader.error);alert('録音データの保存に失敗しました');cleanup();};
       reader.onload=ev=>{
         tempAudio=ev.target.result;
         const prev=document.getElementById('recPreview');
         prev.src=tempAudio;prev.style.display='block';
+        cleanup();
       };
       reader.readAsDataURL(blob);
-      stream.getTracks().forEach(t=>t.stop());
     };
     mediaRec.start();
     const btn=document.getElementById('recBtn');
     btn.className='btn active-rec';
     btn.innerHTML='<i class="ti ti-player-stop" aria-hidden="true"></i>録音停止';
     recInterval=setInterval(()=>{recSec++;document.getElementById('recTimer').textContent=recSec+'秒';},1000);
-  }).catch(()=>alert('マイクへのアクセスを許可してください'));
+  }).catch(err=>{console.error('マイクへのアクセスに失敗しました',err);alert('マイクへのアクセスを許可してください');});
 }
 
 function stopRec(){
