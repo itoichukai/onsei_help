@@ -84,7 +84,7 @@ select,input[type=text]{font-size:13px;padding:6px 10px;border:1px solid #ccc;bo
         <div class="img-placeholder" id="imgPlaceholder"><i class="ti ti-photo" aria-hidden="true" style="font-size:22px;color:#bbb"></i></div>
         <img class="img-preview" id="imgPreview" alt="">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn" onclick="document.getElementById('imgInput').click()"><i class="ti ti-upload" aria-hidden="true"></i>画像を選択</button>
+          <button class="btn" onclick="$('imgInput').click()"><i class="ti ti-upload" aria-hidden="true"></i>画像を選択</button>
           <button class="btn danger" id="imgClearBtn"><i class="ti ti-x" aria-hidden="true"></i>画像を削除</button>
         </div>
         <input type="file" id="imgInput" accept="image/*" style="display:none">
@@ -123,16 +123,34 @@ const COLORS=[
   {name:'橙',val:'#fff0e0'},
 ];
 let state={level:0,cols:4,volume:1};
-let data=Array.from({length:LEVELS},()=>Array.from({length:CELLS},()=>({label:'',imgSrc:'',audioB64:'',color:''})));
+let data=Array.from({length:LEVELS},()=>Array.from({length:CELLS},()=>emptyCell()));
 let editIdx=null,mediaRec=null,recChunks=[],recInterval=null,recSec=0,tempAudio='',tempImg='',currentAudio=null;
 
 try{const s=localStorage.getItem('voca_data_v2');if(s)data=JSON.parse(s);}catch(e){}
 function save(){try{localStorage.setItem('voca_data_v2',JSON.stringify(data));}catch(e){alert('保存容量が不足しています。不要なボタンをクリアしてください。');}}
 
-const grid=document.getElementById('grid');
-const colSelect=document.getElementById('colSelect');
-const volSlider=document.getElementById('volSlider');
-const levelTabs=document.getElementById('levelTabs');
+function $(id){return document.querySelector('#'+id);}
+function emptyCell(){return {label:'',imgSrc:'',audioB64:'',color:''};}
+function resetRecBtn(){
+  const btn=$('recBtn');
+  btn.className='btn';
+  btn.innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+}
+function setImgPreview(src){
+  const prev=$('imgPreview'),ph=$('imgPlaceholder');
+  if(src){prev.src=src;prev.style.display='block';ph.style.display='none';}
+  else{prev.style.display='none';ph.style.display='flex';}
+}
+function setAudioPreview(src){
+  const prev=$('recPreview');
+  if(src){prev.src=src;prev.style.display='block';}
+  else{prev.src='';prev.style.display='none';}
+}
+
+const grid=$('grid');
+const colSelect=$('colSelect');
+const volSlider=$('volSlider');
+const levelTabs=$('levelTabs');
 
 function buildLevelTabs(){
   levelTabs.innerHTML='';
@@ -184,25 +202,20 @@ volSlider.oninput=()=>{state.volume=parseFloat(volSlider.value);};
 function openModal(i){
   editIdx=i;
   const c=data[state.level][i];
-  document.getElementById('labelInput').value=c.label||'';
+  $('labelInput').value=c.label||'';
   tempAudio=c.audioB64||'';
   tempImg=c.imgSrc||'';
-  const prev=document.getElementById('recPreview');
-  if(tempAudio){prev.src=tempAudio;prev.style.display='block';}else{prev.style.display='none';prev.src='';}
-  const imgPrev=document.getElementById('imgPreview');
-  const imgPh=document.getElementById('imgPlaceholder');
-  if(tempImg){imgPrev.src=tempImg;imgPrev.style.display='block';imgPh.style.display='none';}
-  else{imgPrev.style.display='none';imgPh.style.display='flex';}
-  document.getElementById('recTimer').textContent='';
-  document.getElementById('recBtn').className='btn';
-  document.getElementById('recBtn').innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+  setAudioPreview(tempAudio);
+  setImgPreview(tempImg);
+  $('recTimer').textContent='';
+  resetRecBtn();
   buildColorPicker(c.color||'');
-  document.getElementById('modalBg').classList.add('open');
-  setTimeout(()=>document.getElementById('labelInput').focus(),100);
+  $('modalBg').classList.add('open');
+  setTimeout(()=>$('labelInput').focus(),100);
 }
 
 function buildColorPicker(current){
-  const cp=document.getElementById('colorPicker');
+  const cp=$('colorPicker');
   cp._sel=current;
   cp.innerHTML='';
   COLORS.forEach(({name,val})=>{
@@ -216,13 +229,13 @@ function buildColorPicker(current){
 
 function closeModal(){
   stopRec();
-  document.getElementById('modalBg').classList.remove('open');
+  $('modalBg').classList.remove('open');
   editIdx=null;
 }
 
-document.getElementById('modalBg').onclick=e=>{if(e.target===document.getElementById('modalBg'))closeModal();};
+$('modalBg').onclick=e=>{if(e.target===$('modalBg'))closeModal();};
 
-document.getElementById('imgInput').onchange=function(){
+$('imgInput').onchange=function(){
   const file=this.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
@@ -236,29 +249,26 @@ document.getElementById('imgInput').onchange=function(){
       const sx=(img.width-r)/2,sy=(img.height-r)/2;
       ctx.drawImage(img,sx,sy,r,r,0,0,size,size);
       tempImg=canvas.toDataURL('image/jpeg',0.7);
-      document.getElementById('imgPreview').src=tempImg;
-      document.getElementById('imgPreview').style.display='block';
-      document.getElementById('imgPlaceholder').style.display='none';
+      setImgPreview(tempImg);
     };
     img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 };
 
-document.getElementById('imgClearBtn').onclick=()=>{
+$('imgClearBtn').onclick=()=>{
   tempImg='';
-  document.getElementById('imgPreview').style.display='none';
-  document.getElementById('imgPlaceholder').style.display='flex';
-  document.getElementById('imgInput').value='';
+  setImgPreview('');
+  $('imgInput').value='';
 };
 
-document.getElementById('recBtn').onclick=toggleRec;
+$('recBtn').onclick=toggleRec;
 
 function toggleRec(){
   if(mediaRec&&mediaRec.state==='recording'){stopRec();return;}
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
     recChunks=[];recSec=0;
-    document.getElementById('recTimer').textContent='0秒';
+    $('recTimer').textContent='0秒';
     const mimeType=MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/mp4';
     mediaRec=new MediaRecorder(stream,{mimeType});
     mediaRec.ondataavailable=e=>{if(e.data.size>0)recChunks.push(e.data);};
@@ -267,41 +277,38 @@ function toggleRec(){
       const reader=new FileReader();
       reader.onload=ev=>{
         tempAudio=ev.target.result;
-        const prev=document.getElementById('recPreview');
-        prev.src=tempAudio;prev.style.display='block';
+        setAudioPreview(tempAudio);
       };
       reader.readAsDataURL(blob);
       stream.getTracks().forEach(t=>t.stop());
     };
     mediaRec.start();
-    const btn=document.getElementById('recBtn');
+    const btn=$('recBtn');
     btn.className='btn active-rec';
     btn.innerHTML='<i class="ti ti-player-stop" aria-hidden="true"></i>録音停止';
-    recInterval=setInterval(()=>{recSec++;document.getElementById('recTimer').textContent=recSec+'秒';},1000);
+    recInterval=setInterval(()=>{recSec++;$('recTimer').textContent=recSec+'秒';},1000);
   }).catch(()=>alert('マイクへのアクセスを許可してください'));
 }
 
 function stopRec(){
   if(mediaRec&&mediaRec.state==='recording')mediaRec.stop();
   clearInterval(recInterval);
-  const btn=document.getElementById('recBtn');
-  btn.className='btn';
-  btn.innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+  resetRecBtn();
 }
 
-document.getElementById('saveBtn').onclick=()=>{
+$('saveBtn').onclick=()=>{
   if(editIdx===null)return;
-  const label=document.getElementById('labelInput').value.trim();
-  const cp=document.getElementById('colorPicker');
+  const label=$('labelInput').value.trim();
+  const cp=$('colorPicker');
   const color=cp._sel!==undefined?cp._sel:'';
   data[state.level][editIdx]={label,imgSrc:tempImg,audioB64:tempAudio,color};
   save();renderGrid();closeModal();
 };
 
-document.getElementById('clearBtn').onclick=()=>{
+$('clearBtn').onclick=()=>{
   if(editIdx===null)return;
   if(!confirm('このボタンの内容を消去しますか？'))return;
-  data[state.level][editIdx]={label:'',imgSrc:'',audioB64:'',color:''};
+  data[state.level][editIdx]=emptyCell();
   save();renderGrid();closeModal();
 };
 
