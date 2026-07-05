@@ -7,7 +7,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="VOCAアプリ">
 <title>VOCAアプリV2</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src https://cdn.jsdelivr.net; media-src blob: data:; img-src 'self' data: blob:; script-src 'unsafe-inline'">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css" integrity="sha384-/Bmojb1H/9dHvtYa2TzEQ1MldjNefaS+t7DcnOYHpP+yer5gvd3LONWEpWhHK+Yo" crossorigin="anonymous">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a18;min-height:100vh}
@@ -126,7 +127,25 @@ let state={level:0,cols:4,volume:1};
 let data=Array.from({length:LEVELS},()=>Array.from({length:CELLS},()=>({label:'',imgSrc:'',audioB64:'',color:''})));
 let editIdx=null,mediaRec=null,recChunks=[],recInterval=null,recSec=0,tempAudio='',tempImg='',currentAudio=null;
 
-try{const s=localStorage.getItem('voca_data_v2');if(s)data=JSON.parse(s);}catch(e){}
+try{
+  const s=localStorage.getItem('voca_data_v2');
+  if(s){
+    const parsed=JSON.parse(s);
+    if(Array.isArray(parsed)&&parsed.length===LEVELS){
+      data=parsed.map(level=>{
+        if(!Array.isArray(level))return Array.from({length:CELLS},()=>({label:'',imgSrc:'',audioB64:'',color:''}));
+        return level.slice(0,CELLS).map(cell=>{
+          if(!cell||typeof cell!=='object')return{label:'',imgSrc:'',audioB64:'',color:''};
+          const label=typeof cell.label==='string'?cell.label.slice(0,200):'';
+          const imgSrc=(typeof cell.imgSrc==='string'&&cell.imgSrc.startsWith('data:'))?cell.imgSrc:'';
+          const audioB64=(typeof cell.audioB64==='string'&&cell.audioB64.startsWith('data:'))?cell.audioB64:'';
+          const color=(typeof cell.color==='string'&&/^(#[0-9a-fA-F]{6})?$/.test(cell.color))?cell.color:'';
+          return{label,imgSrc,audioB64,color};
+        });
+      });
+    }
+  }
+}catch(e){}
 function save(){try{localStorage.setItem('voca_data_v2',JSON.stringify(data));}catch(e){alert('保存容量が不足しています。不要なボタンをクリアしてください。');}}
 
 const grid=document.getElementById('grid');
@@ -156,7 +175,8 @@ function renderGrid(){
     if(c.imgSrc){const im=document.createElement('img');im.src=c.imgSrc;im.alt=c.label||'';div.appendChild(im);}
     if(c.label){const sp=document.createElement('span');sp.className='label';sp.textContent=c.label;div.appendChild(sp);}
     if(!c.label&&!c.imgSrc){const sp=document.createElement('span');sp.className='no-content';sp.textContent='タップして設定';div.appendChild(sp);}
-    const eb=document.createElement('button');eb.className='edit-btn';eb.innerHTML='<i class="ti ti-pencil" aria-hidden="true"></i>';eb.title='編集';
+    const eb=document.createElement('button');eb.className='edit-btn';eb.title='編集';
+    const ebIcon=document.createElement('i');ebIcon.className='ti ti-pencil';ebIcon.setAttribute('aria-hidden','true');eb.appendChild(ebIcon);
     eb.onclick=e=>{e.stopPropagation();openModal(i);};
     div.appendChild(eb);
     div.onclick=()=>{const c=data[state.level][i];if(c.audioB64)playCell(i,div);else openModal(i);};
@@ -195,7 +215,7 @@ function openModal(i){
   else{imgPrev.style.display='none';imgPh.style.display='flex';}
   document.getElementById('recTimer').textContent='';
   document.getElementById('recBtn').className='btn';
-  document.getElementById('recBtn').innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+  setButtonContent(document.getElementById('recBtn'),'ti-microphone','録音開始');
   buildColorPicker(c.color||'');
   document.getElementById('modalBg').classList.add('open');
   setTimeout(()=>document.getElementById('labelInput').focus(),100);
@@ -276,7 +296,7 @@ function toggleRec(){
     mediaRec.start();
     const btn=document.getElementById('recBtn');
     btn.className='btn active-rec';
-    btn.innerHTML='<i class="ti ti-player-stop" aria-hidden="true"></i>録音停止';
+    setButtonContent(btn,'ti-player-stop','録音停止');
     recInterval=setInterval(()=>{recSec++;document.getElementById('recTimer').textContent=recSec+'秒';},1000);
   }).catch(()=>alert('マイクへのアクセスを許可してください'));
 }
@@ -286,12 +306,12 @@ function stopRec(){
   clearInterval(recInterval);
   const btn=document.getElementById('recBtn');
   btn.className='btn';
-  btn.innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i>録音開始';
+  setButtonContent(btn,'ti-microphone','録音開始');
 }
 
 document.getElementById('saveBtn').onclick=()=>{
   if(editIdx===null)return;
-  const label=document.getElementById('labelInput').value.trim();
+  const label=document.getElementById('labelInput').value.trim().slice(0,200);
   const cp=document.getElementById('colorPicker');
   const color=cp._sel!==undefined?cp._sel:'';
   data[state.level][editIdx]={label,imgSrc:tempImg,audioB64:tempAudio,color};
@@ -304,6 +324,12 @@ document.getElementById('clearBtn').onclick=()=>{
   data[state.level][editIdx]={label:'',imgSrc:'',audioB64:'',color:''};
   save();renderGrid();closeModal();
 };
+
+function setButtonContent(btn,iconClass,text){
+  btn.textContent='';
+  const i=document.createElement('i');i.className='ti '+iconClass;i.setAttribute('aria-hidden','true');
+  btn.appendChild(i);btn.appendChild(document.createTextNode(text));
+}
 
 buildLevelTabs();
 renderGrid();
