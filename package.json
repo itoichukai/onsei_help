@@ -1,0 +1,16 @@
+{
+  "name": "onsei_help",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "VOCA communication-aid web app",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jsdom": "^24.1.3"
+  }
+}
